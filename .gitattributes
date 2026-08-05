@@ -1,0 +1,8 @@
+# =============================================================
+#  .gitattributes — VPS LICENSE GATE
+#  Forzar LF en scripts bash (evita problemas CRLF en Linux)
+# =============================================================
+
+*.sh text eol=lf
+*.bash text eol=lf
+*.ps1 text eol=crlf

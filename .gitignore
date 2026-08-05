@@ -1,0 +1,11 @@
+# =============================================================
+#  .gitignore — VPS LICENSE GATE
+#  Protege los archivos privados del vendedor
+# =============================================================
+
+# Configuración real del generador (NUNCA subir)
+generador/config-generador.ps1
+
+# Archivos temporales
+*.tmp
+*.log

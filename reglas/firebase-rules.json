@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "licencias_movivip": {
+      ".read": false,
+      ".write": false,
+
+      "$key": {
+        ".read": true,
+        ".write": false
+      }
+    },
+
+    "activaciones_movivip": {
+      ".read": false,
+      ".write": true,
+
+      "$key": {
+        ".read": true,
+        ".write": true
+      }
+    }
+  }
+}
