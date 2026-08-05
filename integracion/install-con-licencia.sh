@@ -15,6 +15,88 @@
 # =============================================================
 
 # =============================================================
+#  PARTE 0 — PREPARACIÓN DEL ENTORNO
+#  Evita cuelgues por diálogos de apt y errores de tput/TERM
+# =============================================================
+
+export DEBIAN_FRONTEND=noninteractive
+export TERM="${TERM:-xterm}"
+
+# =============================================================
+#  PARTE 0.5 — REPARACIÓN AUTOMÁTICA DEL SISTEMA
+#  -------------------------------------------------------------
+#  Blindaje: muchos clientes vienen de OTROS scripts que dejaron
+#  el sistema con apt/dpkg dañado. Esto corrige SOLO los errores
+#  más comunes SIN tocar la instalación del cliente:
+#
+#   1. Lock de apt colgado (proceso muerto/huérfano con el lock)
+#   2. dpkg a medio configurar (paquetes rotos por instalación cortada)
+#   3. Dependencias rotas (apt-get -f install)
+#   4. apt colgado pidiendo input (dpkg-preconfigure / debconf)
+#   5. Listas de apt corruptas (apt update falla)
+# =============================================================
+
+# Detectar si el sistema de paquetes está dañado (rápido si está sano)
+sistema_apt_danado() {
+    fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 && return 0
+    dpkg --audit >/dev/null 2>&1 && return 0
+    apt-get check >/dev/null 2>&1 || return 0
+    return 1
+}
+
+reparar_apt() {
+    echo ""
+    echo "🔧 Detectado sistema con apt/dpkg dañado. Reparando automáticamente..."
+    echo ""
+
+    # 1. Esperar a que se libere el lock (procesos legítimos terminan solos)
+    local espera=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [[ $espera -ge 60 ]]; then
+            break
+        fi
+        echo "   ...esperando a que se libere el lock de apt (${espera}s)"
+        sleep 5
+        espera=$((espera + 5))
+    done
+
+    # 2. Si sigue tomado, terminar el proceso colgado y limpiar locks huérfanos
+    if fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        echo "   ⚠️  Lock tomado por un proceso colgado — terminándolo..."
+        for pid in $(fuser /var/lib/dpkg/lock-frontend 2>/dev/null); do
+            kill -9 "$pid" 2>/dev/null || true
+        done
+        sleep 2
+        rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock 2>/dev/null || true
+        echo "   ✅ Lock liberado."
+    fi
+
+    # 3. Configurar paquetes pendientes (dpkg a medio instalar)
+    echo "   🔧 Configurando paquetes pendientes..."
+    dpkg --configure -a >/dev/null 2>&1 || true
+
+    # 4. Reparar dependencias rotas
+    echo "   🔧 Corrigiendo dependencias rotas..."
+    apt-get -f install -y >/dev/null 2>&1 || true
+
+    # 5. Si apt update falla, limpiar listas corruptas y reintentar
+    if ! apt-get update -y >/tmp/movivip-apt-update.log 2>&1; then
+        echo "   ⚠️  apt update falló — limpiando listas corruptas..."
+        rm -rf /var/lib/apt/lists/* 2>/dev/null
+        apt-get update -y >/tmp/movivip-apt-update.log 2>&1 || true
+    fi
+
+    echo ""
+    echo "   ✅ Sistema de paquetes reparado. Continuando..."
+    echo ""
+}
+
+# Ejecutar reparación SIEMPRE (el chequeo es instantáneo en sistemas sanos)
+if sistema_apt_danado; then
+    reparar_apt
+fi
+
+# =============================================================
 #  PARTE 1 — GATE DE LICENCIA (valida antes de instalar)
 # =============================================================
 
@@ -28,7 +110,7 @@ echo "   🔑 SISTEMA CON LICENCIA — VALIDACIÓN"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Asegurar curl
+# Asegurar curl (si apt estaba roto, ya lo reparó la Parte 0.5)
 command -v curl >/dev/null 2>&1 || apt-get install -y curl >/dev/null 2>&1
 
 # Descargar el gate
@@ -112,7 +194,6 @@ sleep 1
 echo "📦 Instalando paquetes básicos..."
 
 apt update -y
-
 apt install -y \
 curl \
 wget \
@@ -167,6 +248,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 read -p "🌐 Dominio Cloudflare: " SERVER_DOMAIN
 read -p "🌐 Dominio Cloudfront (Enter si no): " CLOUDFRONT_DOMAIN
+
+# Si no hay input (instalación no interactiva), continuar con valores vacíos
+SERVER_DOMAIN="${SERVER_DOMAIN:-}"
+CLOUDFRONT_DOMAIN="${CLOUDFRONT_DOMAIN:-}"
 
 SERVER_IP=$(curl -s ifconfig.me)
 
