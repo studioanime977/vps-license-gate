@@ -116,11 +116,23 @@ try {
     $plantilla = $plantilla.Replace("{{INICIO}}", $ahora.ToString('dd/MM/yyyy'))
     $plantilla = $plantilla.Replace("{{FIN}}", $expira.ToString('dd/MM/yyyy'))
 
-    $nombreArchivo = ("entrega-" + ($clienteFinal -replace '[^a-zA-Z0-9]', '-') + "-" + $KEY + ".md")
+    # Nombre del archivo usa el nombre del cliente que colocaste (limpiado de caracteres raros)
+    $nombreLimpio = ($clienteFinal -replace '[^a-zA-Z0-9 ]', '') -replace '\s+', ' '
+    $nombreArchivo = "$nombreLimpio.txt"
     $rutaSalida = Join-Path $OUTPUT_DIR $nombreArchivo
-    [System.IO.File]::WriteAllText($rutaSalida, $plantilla, (New-Object System.Text.UTF8Encoding($true)))
+
+    # Si ya existe, agregar numero para no sobreescribir
+    $contador = 2
+    $rutaFinal = $rutaSalida
+    while (Test-Path -LiteralPath $rutaFinal) {
+        $nombreArchivo = "$nombreLimpio-$contador.txt"
+        $rutaFinal = Join-Path $OUTPUT_DIR $nombreArchivo
+        $contador++
+    }
+
+    [System.IO.File]::WriteAllText($rutaFinal, $plantilla, (New-Object System.Text.UTF8Encoding($true)))
     Write-OK "Documento de entrega creado:"
-    Write-OK "   $rutaSalida"
+    Write-OK "   $rutaFinal"
 } catch {
     Write-ERR "Error al crear el documento: $($_.Exception.Message)"
     exit 1
@@ -134,7 +146,7 @@ Write-Host ""
 Write-Host "   KEY DE LICENCIA:  $KEY" -ForegroundColor White -BackgroundColor DarkGreen
 Write-Host "   Valida hasta:     $($expira.ToString('yyyy-MM-dd HH:mm'))"
 Write-Host ""
-Write-Host "   Documento completo: $nombreArchivo"
+Write-Host "   Archivo txt: $nombreArchivo" -ForegroundColor Yellow
 Write-Host "   (abrelo y copia TODO el contenido en WhatsApp)"
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
@@ -144,3 +156,16 @@ try {
     Set-Clipboard -Value $KEY
     Write-INFO "Key copiada al portapapeles"
 } catch { }
+
+# Abrir el txt automaticamente (Bloc de notas)
+try {
+    Start-Process notepad.exe -ArgumentList "`"$rutaFinal`""
+    Write-INFO "Abriendo el archivo en el Bloc de notas..."
+} catch { }
+
+# Pausa para que la ventana NO se cierre (solo si hay consola interactiva)
+if (-not [Console]::IsInputRedirected) {
+    Write-Host ""
+    Write-Host "Presiona ENTER para cerrar..." -ForegroundColor Cyan
+    Read-Host | Out-Null
+}
