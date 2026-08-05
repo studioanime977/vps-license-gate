@@ -26,7 +26,7 @@
 
 # ================= CONFIGURACIÓN =================
 # URL de la Realtime Database (SIN https:// y SIN .json)
-FB_BASE="keygenbpt-default-rtdb.firebaseio.com"
+FB_BASE="movivip-network-default-rtdb.firebaseio.com"
 # Rama donde viven las licencias
 FB_LICENCIAS="licencias_movivip"
 # Rama donde se registran las activaciones (trazabilidad)
