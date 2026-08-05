@@ -6,6 +6,14 @@
 # Configuración real del generador (NUNCA subir)
 generador/config-generador.ps1
 
+# Entregas de clientes (NUNCA subir: contienen datos de clientes)
+entregas/
+generador/entregas/
+
 # Archivos temporales
 *.tmp
 *.log
+
+# Sensible por si se copia de nuevo al repo
+reglas/
+docs/
