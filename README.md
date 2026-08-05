@@ -21,6 +21,20 @@ Sistema de **validación de licencia con Firebase** para scripts VPS.
 6. **Multi-instalación controlada**: el modelo de negocio permite N VPS por key
 7. **El script no contiene secretos**: solo la URL pública de la RTDB
 
+## 🔧 Auto-reparación (clientes con sistema dañado)
+
+Muchos clientes llegan **después de probar otros scripts** que dejaron el sistema con apt/dpkg dañado. El instalador **detecta y repara automáticamente** sin que el cliente haga nada:
+
+| Problema del sistema | Qué hace el instalador |
+|----------------------|------------------------|
+| Lock de apt tomado por proceso colgado/huérfano | Espera 60s → lo mata → libera el lock |
+| Paquetes a medio configurar (instalación cortada) | `dpkg --configure -a` automático |
+| Dependencias rotas | `apt-get -f install -y` automático |
+| apt colgado pidiendo input (`dpkg-preconfigure`) | `DEBIAN_FRONTEND=noninteractive` |
+| Listas de apt corruptas (`apt update` falla) | Limpia listas y reintenta |
+
+> ✅ Verificado en pruebas reales con lock huérfano y dpkg roto simulados: el instalador repara y continúa sin intervención del usuario.
+
 ## 🚀 Uso para el cliente
 
 ```bash
