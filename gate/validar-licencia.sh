@@ -7,9 +7,13 @@
 #
 #  MODELO DE NEGOCIO:
 #   - El cliente recibe una key al comprar
-#   - Puede instalar en CUANTAS VPS quiera durante 30 días
-#   - Pasados los 30 días, la key ya NO instala en VPS nuevas
-#   - Los ya instalados siguen recibiendo actualizaciones (git pull)
+#   - La key se valida contra Firebase al INSTALAR y al ACTUALIZAR
+#   - NINGÚN plan se desactiva por no pagar: el panel y los protocolos
+#     siguen funcionando normal SIEMPRE (no hay kill-switch).
+#   - La licencia SOLO controla las ACTUALIZACIONES:
+#       · plan activo   -> puede actualizar cuando quiera (él decide)
+#       · plan vencido  -> se le NOTIFICA la actualización disponible,
+#                          pero no se descarga. Renueva para actualizar.
 #
 #  SEGURIDAD:
 #   - La decisión final la toma Firebase (servidor), no el script
@@ -22,6 +26,9 @@
 #    ./validar-licencia.sh KEY-XXXXXXXXXX     # valida la key dada
 #    LICENCIA_KEY=KEY-XXX ./validar-licencia.sh  # vía variable de entorno
 #    ./validar-licencia.sh --test KEY-XXX     # modo prueba (no registra)
+#    ./validar-licencia.sh --check KEY-XXX    # MODO SILENCIOSO: solo código
+#       devuelve: 0 = activa | 1 = no activa/vencida | 2 = error de red
+#       (lo usa update.sh para decidir si permite actualizar)
 # =============================================================
 
 # ================= CONFIGURACIÓN =================
@@ -83,14 +90,38 @@ json_get() {
 
 # ================= MAIN =================
 main() {
-    local KEY="" TEST_MODE=0
+    local KEY="" TEST_MODE=0 CHECK_MODE=0
 
     # Parsear argumentos
     if [[ "$1" == "--test" ]]; then
         TEST_MODE=1
         shift
     fi
+    if [[ "$1" == "--check" ]]; then
+        CHECK_MODE=1
+        shift
+    fi
     KEY="${1:-$LICENCIA_KEY}"
+
+    # ============================================================
+    # MODO CHECK (silencioso) — lo usa update.sh para decidir si
+    # permite actualizar. Devuelve: 0 activa | 1 no activa | 2 red
+    # ============================================================
+    if [[ $CHECK_MODE -eq 1 ]]; then
+        [[ -z "$KEY" ]] && return 2
+        if ! key_formato_valido "$KEY"; then return 1; fi
+        local resp
+        resp=$(firebase_consulta "$KEY")
+        local code=$?
+        [[ $code -ne 0 ]] && return "$code"   # 2 = sin red, 1 = no existe
+        local activa expira now
+        activa=$(json_get "$resp" "activa")
+        expira=$(json_get "$resp" "expira")
+        if [[ "$activa" != "true" ]]; then return 1; fi
+        now=$(date +%s)
+        if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$now" -gt "$expira" ]]; then return 1; fi
+        return 0
+    fi
 
     # Encabezado
     clear 2>/dev/null
@@ -128,6 +159,15 @@ main() {
         log_err "La clave '$KEY' no existe en el sistema."
         echo ""
         log_warn "💡 Adquiere una licencia válida para instalar este sistema."
+        log_warn ""
+        log_warn "   Contacto:"
+        log_warn "   ───────────────────────────────────────────"
+        log_warn "   💬 Telegram : @MoviVIP"
+        log_warn "   📱 WhatsApp : +57 311 700 8185"
+        log_warn "   🌐 Web      : https://movivip-network.web.app"
+        log_warn "   📢 Canal    : https://t.me/MoviVIPNetwork"
+        log_warn "   👥 Grupo    : https://t.me/MoviVIPNet"
+        log_warn "   ───────────────────────────────────────────"
         return 1
     fi
 
@@ -157,18 +197,20 @@ main() {
         log_err "❌ LICENCIA EXPIRADA."
         log_err "Esta clave venció el: ${expira_humano:-$expira}"
         echo ""
-        log_warn "💡 Renueva tu licencia para seguir instalando en nuevos servidores."
+        log_warn "ℹ️  Tu panel y protocolos SIGUEN funcionando normal."
+        log_warn "💡 Renueva tu licencia para seguir recibiendo actualizaciones."
         return 1
     fi
 
-    # Mostrar días restantes
+    # Mostrar estado
     if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ ]]; then
         local dias_restantes
         dias_restantes=$(( (expira - now) / 86400 ))
         [[ $dias_restantes -lt 0 ]] && dias_restantes=0
-        log_ok "Licencia VÁLIDA — ${dias_restantes} día(s) restantes para instalar en nuevos VPS."
+        log_ok "Licencia VÁLIDA — plan ${plan:-standard}, ${dias_restantes} día(s) de licencia."
+        log_ok "Puedes recibir actualizaciones. (el panel nunca se desactiva)"
     else
-        log_ok "Licencia VÁLIDA (sin fecha de expiración)."
+        log_ok "Licencia VÁLIDA (sin fecha de expiración). Puedes recibir actualizaciones."
     fi
 
     # Guardar licencia local
@@ -180,6 +222,7 @@ ACTIVADA="$(date '+%Y-%m-%d %H:%M:%S')"
 EXPIRA="$expira"
 PLAN="$plan"
 CLIENTE="$cliente"
+LICENCIA_ACTIVA="true"
 EOF
         chmod 600 "$LICENCIA_FILE" 2>/dev/null
         log_ok "Licencia guardada en $LICENCIA_FILE"

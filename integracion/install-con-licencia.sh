@@ -132,7 +132,15 @@ if [[ $GATE_RESULT -ne 0 ]]; then
     echo "   ❌ INSTALACIÓN BLOQUEADA — LICENCIA NO VÁLIDA"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "   Este sistema requiere una clave de licencia válida."
-    echo "   💡 Adquiere tu licencia para instalar."
+    echo ""
+    echo "   🔑 Adquiere tu licencia aquí:"
+    echo "   ─────────────────────────────────────────"
+    echo "   💬 Telegram : @MoviVIP"
+    echo "   📱 WhatsApp : +57 311 700 8185"
+    echo "   🌐 Web      : https://movivip-network.web.app"
+    echo "   📢 Canal    : https://t.me/MoviVIPNetwork"
+    echo "   👥 Grupo    : https://t.me/MoviVIPNet"
+    echo "   ─────────────────────────────────────────"
     echo ""
     exit 1
 fi
@@ -433,6 +441,64 @@ if [[ ! -f /etc/movivip/menu.sh ]]; then
     echo "❌ ERROR: menu.sh no fue instalado"
     exit 1
 fi
+
+#==============================
+# BOT SEGÚN PLAN — la key define qué se entrega
+#   BRONCE    -> solo script multi-protocolo (sin bot)
+#   PREMIUM+  -> script + bot del cliente (paquete en /root/movivip_bots)
+#==============================
+
+LICENCIA_CONF="/etc/movivip/licencia.conf"
+PLAN_KEY="bronce"
+
+if [[ -f "$LICENCIA_CONF" ]]; then
+    source "$LICENCIA_CONF"
+    PLAN_KEY="${PLAN:-bronce}"
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "     🤖 BOT SEGÚN PLAN: $PLAN_KEY"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+case "${PLAN_KEY,,}" in
+    bronce)
+        echo "   📦 Tu plan BRONCE incluye SOLO el script multi-protocolo."
+        echo "   ✅ Todos los protocolos VPN (SSH, Dropbear, SSL, UDP, Xray...)"
+        echo "   🚫 El bot admin/user es EXCLUSIVO de los planes PREMIUM+."
+        echo ""
+        echo "   💡 Para subir de plan, contacta a tu proveedor."
+        ;;
+    premium|platino|vitalicio)
+        echo "   ✅ Tu plan $PLAN_KEY incluye script + BOT de administración."
+        echo ""
+        # El bot se descarga desde GitHub según el plan y el cliente de la key
+        # (paquete generado por el vendedor con generar-bot-cliente.ps1 y
+        #  publicado en studioanime977/movivip-bots/<cliente>/).
+        if [[ -f /etc/movivip/protocolos/bot.sh ]]; then
+            echo "   🚀 Instalando bot desde el repo de entregas (plan $PLAN_KEY)..."
+            bash /etc/movivip/protocolos/bot.sh --install
+            echo ""
+            if [[ -d /root/movivip_bots ]]; then
+                echo "   ✅ Bot instalado. Actívalo/configúralo desde el menú:"
+                echo "      menu → [10] 🤖 Bot Admin"
+                echo "      (el bot SOLO crea cuentas SSH y entrega la plantilla de acceso)"
+            else
+                echo "   ⚠️  El paquete del bot para tu licencia aún no está publicado."
+                echo "   👉 Contacta a tu proveedor para que genere tu bot."
+            fi
+        else
+            echo "   ⚠️  bot.sh no encontrado. Instala el bot más tarde desde:"
+            echo "      menu → [10] 🤖 Bot Admin"
+        fi
+        ;;
+    *)
+        echo "   ⚠️  Plan desconocido ('$PLAN_KEY'). Se entrega solo el script."
+        ;;
+esac
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 #==============================
 # CONFIGURAR FAIL2BAN (seguridad)
