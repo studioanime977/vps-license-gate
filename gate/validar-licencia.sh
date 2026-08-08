@@ -119,7 +119,8 @@ main() {
         expira=$(json_get "$resp" "expira")
         if [[ "$activa" != "true" ]]; then return 1; fi
         now=$(date +%s)
-        if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$now" -gt "$expira" ]]; then return 1; fi
+        # expira=0 o vacio => VITALICIA (de por vida). Solo expira si expira > 0 y ya paso
+        if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$expira" -gt 0 && "$now" -gt "$expira" ]]; then return 1; fi
         return 0
     fi
 
@@ -191,7 +192,8 @@ main() {
     # Verificar expiración
     local now
     now=$(date +%s)
-    if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$now" -gt "$expira" ]]; then
+    # expira=0 o vacio => VITALICIA (de por vida). Solo expira si expira > 0 y ya paso
+    if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$expira" -gt 0 && "$now" -gt "$expira" ]]; then
         local expira_humano
         expira_humano=$(date -d "@$expira" '+%Y-%m-%d %H:%M' 2>/dev/null || date -r "$expira" '+%Y-%m-%d %H:%M' 2>/dev/null)
         log_err "❌ LICENCIA EXPIRADA."
@@ -203,7 +205,7 @@ main() {
     fi
 
     # Mostrar estado
-    if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ ]]; then
+    if [[ -n "$expira" && "$expira" =~ ^[0-9]+$ && "$expira" -gt 0 ]]; then
         local dias_restantes
         dias_restantes=$(( (expira - now) / 86400 ))
         [[ $dias_restantes -lt 0 ]] && dias_restantes=0
