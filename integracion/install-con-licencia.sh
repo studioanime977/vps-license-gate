@@ -96,6 +96,12 @@ echo ""
 echo "✅ LICENCIA VALIDADA — CONTINUANDO INSTALACIÓN..."
 echo ""
 
+# Guardar key en temp para que install.sh la lea (el cleanup borra /etc/movivip)
+if [[ -f /etc/movivip/licencia.conf ]]; then
+    source /etc/movivip/licencia.conf 2>/dev/null
+    [[ -n "$KEY" ]] && echo "$KEY" > /tmp/movivip-key.txt
+fi
+
 # =============================================================
 #  PARTE 2 — ACTUALIZACIÓN (si ya existe /etc/movivip)
 # =============================================================
@@ -145,7 +151,8 @@ echo ""
 echo "🚀 Ejecutando instalador completo con selector de protocolos..."
 echo ""
 
-bash "$INSTALL_TMP"
+# Pass key via env var (install.sh checks LICENCIA_KEY first)
+LICENCIA_KEY=$(cat /tmp/movivip-key.txt 2>/dev/null) bash "$INSTALL_TMP"
 INSTALL_EXIT=$?
 
 rm -f "$INSTALL_TMP"
