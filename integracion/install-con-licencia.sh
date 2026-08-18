@@ -1,8 +1,9 @@
 #!/bin/bash
 # =============================================================
-#  INSTALADOR CON VALIDACIÓN DE LICENCIA v5.0
+#  INSTALADOR CON VALIDACION DE LICENCIA v5.1
 #  -------------------------------------------------------------
-#  Wrapper fino: valida licencia → delega a install.sh de MoviVIPNetwork.
+#  Wrapper fino: valida licencia -> delega a install.sh de MoviVIPNetwork.
+#  Incluye: reparacion apt, health check post-update, auto-repair.
 #
 #  INSTRUCCIONES DE VENTA (dar al cliente):
 #    apt update && apt install -y curl
@@ -13,7 +14,7 @@ export DEBIAN_FRONTEND=noninteractive
 export TERM="${TERM:-xterm}"
 
 # =============================================================
-#  PARTE 0 — REPARACIÓN AUTOMÁTICA DEL SISTEMA
+#  PARTE 0 - REPARACION AUTOMATICA DEL SISTEMA
 # =============================================================
 
 sistema_apt_danado() {
@@ -25,7 +26,7 @@ sistema_apt_danado() {
 
 reparar_apt() {
     echo ""
-    echo "🔧 Detectado sistema con apt/dpkg dañado. Reparando automáticamente..."
+    echo "🔧 Detectado sistema con apt/dpkg danado. Reparando automaticamente..."
     echo ""
     local espera=0
     while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
@@ -55,7 +56,7 @@ if sistema_apt_danado; then
 fi
 
 # =============================================================
-#  PARTE 1 — GATE DE LICENCIA
+#  PARTE 1 - GATE DE LICENCIA
 # =============================================================
 
 GATE_URL="https://raw.githubusercontent.com/studioanime977/vps-license-gate/main/gate/validar-licencia.sh"
@@ -63,15 +64,15 @@ GATE_TMP="/tmp/validar-licencia.sh"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "   🔑 SISTEMA CON LICENCIA — VALIDACIÓN"
+echo "   🔑 SISTEMA CON LICENCIA — VALIDACION"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 command -v curl >/dev/null 2>&1 || apt-get install -y curl >/dev/null 2>&1
 
-echo "Cargando módulo de validación..."
+echo "Cargando modulo de validacion..."
 if ! curl -fsSL --max-time 30 "$GATE_URL" -o "$GATE_TMP" 2>/dev/null; then
-    echo "❌ No se pudo cargar el módulo de validación."
+    echo "❌ No se pudo cargar el modulo de validacion."
     exit 1
 fi
 chmod +x "$GATE_TMP"
@@ -82,7 +83,7 @@ GATE_RESULT=$?
 if [[ $GATE_RESULT -ne 0 ]]; then
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "   ❌ LICENCIA NO VÁLIDA"
+    echo "   ❌ LICENCIA NO VALIDA"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo "   💬 Telegram : @MoviVIP"
@@ -93,7 +94,7 @@ if [[ $GATE_RESULT -ne 0 ]]; then
 fi
 
 echo ""
-echo "✅ LICENCIA VALIDADA — CONTINUANDO INSTALACIÓN..."
+echo "✅ LICENCIA VALIDADA — CONTINUANDO INSTALACION..."
 echo ""
 
 # Guardar key en temp para que install.sh la lea (el cleanup borra /etc/movivip)
@@ -103,42 +104,59 @@ if [[ -f /etc/movivip/licencia.conf ]]; then
 fi
 
 # =============================================================
-#  PARTE 2 — ACTUALIZACIÓN (si ya existe /etc/movivip)
+#  PARTE 2 - ACTUALIZACION (si ya existe /etc/movivip)
 # =============================================================
 
 if [[ -d "/etc/movivip" ]]; then
-    echo "🔄 Actualización detectada..."
+    echo "🔄 Actualizacion detectada..."
+
     if [[ -d "/etc/movivip/.git" ]]; then
         cd /etc/movivip || exit 1
         git reset --hard >/dev/null 2>&1
         git pull origin main >/dev/null 2>&1 || git pull >/dev/null 2>&1
         chmod -R +x /etc/movivip
-        echo "✅ Sistema actualizado correctamente."
-        echo "💡 Reinicia el menú con: menu"
-        exit 0
+
+        # HEALTH CHECK: verificar que la instalacion esta completa
+        _MISSING=0
+        for _f in menu.sh config.conf protocolos usuarios; do
+            [[ ! -e "/etc/movivip/$_f" ]] && _MISSING=1
+        done
+
+        if [[ "$_MISSING" -eq 1 ]]; then
+            echo "⚠️  Actualizacion incompleta (faltan archivos). Reinstalando..."
+            cd /
+            rm -rf /etc/movivip
+            # install.sh auto-repair se encargara
+        else
+            echo "✅ Sistema actualizado correctamente."
+            echo "💡 Reinicia el menu con: menu"
+            exit 0
+        fi
     else
+        echo "⚠️  Instalacion sin git history. Reinstalando limpio..."
         cd /
         rm -rf /etc/movivip
     fi
 fi
 
 # =============================================================
-#  PARTE 3 — INSTALACIÓN NUEVA
+#  PARTE 3 - INSTALACION NUEVA
 #  Descarga install.sh desde MoviVIPNetwork y lo ejecuta.
 #  install.sh contiene TODO:
+#    - Auto-repair de instalaciones incompletas
 #    - Idioma (10 idiomas)
 #    - Paquetes + apt-mark hold
-#    - SSL/TLS + HAProxy automático
+#    - SSL/TLS + HAProxy automatico
 #    - Optimizador (red + iptables + limpieza segura)
 #    - Selector interactivo de protocolos
-#    - Configuración del servidor
+#    - Configuracion del servidor
 #    - Git clone + fail2ban + monitoreo + banner
 # =============================================================
 
 INSTALL_URL="https://raw.githubusercontent.com/studioanime977/MoviVIPNetwork/main/install.sh"
 INSTALL_TMP="/tmp/movivip-install.sh"
 
-echo "📥 Descargando instalador MoviVIP Network v5.0..."
+echo "📥 Descargando instalador MoviVIP Network v5.1..."
 if ! curl -fsSL --max-time 60 "$INSTALL_URL" -o "$INSTALL_TMP" 2>/dev/null; then
     echo "❌ No se pudo descargar el instalador."
     exit 1
@@ -159,7 +177,7 @@ rm -f "$INSTALL_TMP"
 
 if [[ $INSTALL_EXIT -ne 0 ]]; then
     echo ""
-    echo "⚠️  El instalador terminó con código $INSTALL_EXIT"
+    echo "⚠️  El instalador termino con codigo $INSTALL_EXIT"
     exit $INSTALL_EXIT
 fi
 
