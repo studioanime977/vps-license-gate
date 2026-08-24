@@ -50,6 +50,20 @@ log_err()  { echo -e "${RED}[✘]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 log_info() { echo -e "${CYAN}[→]${NC} $1"; }
 
+# Contacto oficial MoviVIP (todas las pantallas de fallo)
+mostrar_contacto() {
+    echo ""
+    echo -e "${CYAN}📞 CONTACTO OFICIAL${NC}"
+    echo -e "${CYAN}───────────────────────────────────────────${NC}"
+    echo -e "${YELLOW}📢 Canal oficial ....... t.me/MoviVIPNetwork${NC}"
+    echo -e "${YELLOW}👥 Grupo oficial ........ t.me/MoviVIPNet${NC}"
+    echo -e "${GREEN}💬 Soporte directo ...... @MoviVIP  (t.me/MoviVIP)${NC}"
+    echo -e "${YELLOW}🌐 Sitio web ............ https://movivip-network.web.app${NC}"
+    echo -e "${YELLOW}📱 WhatsApp ............. +57 311 700 8185${NC}"
+    echo -e "${CYAN}───────────────────────────────────────────${NC}"
+    echo ""
+}
+
 # Validar formato de key: KEY-XXXXXXXXXX (10 hex)
 key_formato_valido() {
     [[ "$1" =~ ^KEY-[0-9A-F]{10}$ ]]
@@ -141,6 +155,7 @@ main() {
         log_err "Formato de clave inválido. Debe ser: KEY-XXXXXXXXXX (10 caracteres hex)"
         echo ""
         log_warn "Ejemplo: KEY-3F8A21C9D4"
+        mostrar_contacto
         return 1
     fi
 
@@ -160,15 +175,7 @@ main() {
         log_err "La clave '$KEY' no existe en el sistema."
         echo ""
         log_warn "💡 Adquiere una licencia válida para instalar este sistema."
-        log_warn ""
-        log_warn "   Contacto:"
-        log_warn "   ───────────────────────────────────────────"
-        log_warn "   💬 Telegram : @MoviVIP"
-        log_warn "   📱 WhatsApp : +57 311 700 8185"
-        log_warn "   🌐 Web      : https://movivip-network.web.app"
-        log_warn "   📢 Canal    : https://t.me/MoviVIPNetwork"
-        log_warn "   👥 Grupo    : https://t.me/MoviVIPNet"
-        log_warn "   ───────────────────────────────────────────"
+        mostrar_contacto
         return 1
     fi
 
@@ -186,6 +193,7 @@ main() {
     if [[ "$activa" != "true" ]]; then
         log_err "❌ LICENCIA DESACTIVADA."
         log_err "Esta clave fue revocada por el proveedor."
+        mostrar_contacto
         return 1
     fi
 
@@ -201,6 +209,7 @@ main() {
         echo ""
         log_warn "ℹ️  Tu panel y protocolos SIGUEN funcionando normal."
         log_warn "💡 Renueva tu licencia para seguir recibiendo actualizaciones."
+        mostrar_contacto
         return 1
     fi
 
