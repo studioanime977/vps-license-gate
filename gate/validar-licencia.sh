@@ -66,7 +66,8 @@ mostrar_contacto() {
 
 # Validar formato de key: KEY-XXXXXXXXXX (10 hex)
 key_formato_valido() {
-    [[ "$1" =~ ^KEY-[0-9A-F]{10}$ ]]
+    local k="$1"
+    [[ -n "$k" ]] && { [[ "$k" =~ ^KEY-[0-9A-F]{10}$ ]] || [[ "${#k}" -eq 40 ]] || [[ "${#k}" -eq 64 ]]; }
 }
 
 # Obtener IP pública
@@ -152,7 +153,7 @@ main() {
 
     # Validar formato
     if ! key_formato_valido "$KEY"; then
-        log_err "Formato de clave inválido. Debe ser: KEY-XXXXXXXXXX (10 caracteres hex)"
+        log_err "Formato de clave inválido. Formato inválido. Usa KEY-XXXXXXXXXX o tu key de 40/64 caracteres"
         echo ""
         log_warn "Ejemplo: KEY-3F8A21C9D4"
         mostrar_contacto
