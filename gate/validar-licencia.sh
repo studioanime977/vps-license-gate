@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================
 #  VPS LICENSE GATE — VALIDADOR DE LICENCIA (Firebase RTDB)
 #  -------------------------------------------------------------
@@ -79,22 +79,39 @@ get_ip() {
     echo "$ip"
 }
 
+# Convertir key a nombre de nodo seguro para Firebase (base64url).
+# El generador registra los nodos reemplazando '+' -> '-' y '/' -> '_',
+# mientras el campo interno "key" guarda el valor original con '+/'.
+# keys legacy (KEY-XXXXXXXXXX) no se ven afectadas.
+key_node_name() {
+    echo "$1" | tr '+/' '-_'
+}
+
 # Consultar la licencia en Firebase
 # Devuelve 0 = key existe, 1 = key no existe, 2 = error de red
 firebase_consulta() {
     local key="$1"
-    local url="https://${FB_BASE}/${FB_LICENCIAS}/${key}.json"
-    local resp
-    resp=$(curl -s --max-time 15 "$url" 2>/dev/null)
-    if [[ $? -ne 0 || -z "$resp" ]]; then
+    local resp node
+    # Intento 1: nodo literal (keys legacy KEY-XXXX o nodos no sanitizados)
+    resp=$(curl -s --max-time 15 "https://${FB_BASE}/${FB_LICENCIAS}/${key}.json" 2>/dev/null)
+    if [[ -n "$resp" && "$resp" != "null" ]]; then
+        echo "$resp"
+        return 0
+    fi
+    # Intento 2: nodo url-safe (patron del generador actual: '+'->'-', '/'->'_')
+    node=$(key_node_name "$key")
+    if [[ "$node" != "$key" ]]; then
+        resp=$(curl -s --max-time 15 "https://${FB_BASE}/${FB_LICENCIAS}/${node}.json" 2>/dev/null)
+        if [[ -n "$resp" && "$resp" != "null" ]]; then
+            echo "$resp"
+            return 0
+        fi
+    fi
+    # Diagnostico final: vacio = error de red, "null" = key no existe
+    if [[ -z "$resp" ]]; then
         return 2
     fi
-    # Si la respuesta es "null" => key no existe
-    if [[ "$resp" == "null" ]]; then
-        return 1
-    fi
-    echo "$resp"
-    return 0
+    return 1
 }
 
 # Extraer campo del JSON (sin jq - compatible con cualquier sistema)
@@ -240,14 +257,16 @@ EOF
         log_ok "Licencia guardada en $LICENCIA_FILE"
 
         # Registrar activación (trazabilidad)
-        local ip fecha ts
+        local ip fecha ts node
         ip=$(get_ip)
         fecha=$(date '+%Y-%m-%d %H:%M:%S')
         ts=$(date +%s)
         local host
         host=$(hostname 2>/dev/null || echo "desconocido")
+        # Usar nombre de nodo sanitizado (base64url) igual que el generador
+        node=$(key_node_name "$KEY")
         curl -s --max-time 15 -X PUT \
-            "https://${FB_BASE}/${FB_ACTIVACIONES}/${KEY}/${ts}.json" \
+            "https://${FB_BASE}/${FB_ACTIVACIONES}/${node}/${ts}.json" \
             -H "Content-Type: application/json" \
             -d "{\"ip\":\"${ip}\",\"hostname\":\"${host}\",\"fecha\":\"${fecha}\"}" >/dev/null 2>&1
         log_ok "Activación registrada (IP: $ip)"
