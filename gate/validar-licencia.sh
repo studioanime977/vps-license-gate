@@ -38,6 +38,10 @@ FB_BASE="movivip-network-default-rtdb.firebaseio.com"
 FB_LICENCIAS="licencias_movivip"
 # Rama donde se registran las activaciones (trazabilidad)
 FB_ACTIVACIONES="activaciones_movivip"
+# Endpoint del BOT (backend-bridge): recibe la activación y la registra en
+# Firebase con su token (la rama activaciones NO permite escritura anónima).
+# Es el canal preferido; el PUT directo a Firebase queda SOLO como fallback.
+BOT_ACTIVACION_ENDPOINT="https://bot.movivipoppax.uk/api/activacion"
 # Archivo local donde se guarda la licencia activa
 LICENCIA_FILE="/etc/movivip/licencia.conf"
 
@@ -256,20 +260,30 @@ EOF
         chmod 600 "$LICENCIA_FILE" 2>/dev/null
         log_ok "Licencia guardada en $LICENCIA_FILE"
 
-        # Registrar activación (trazabilidad)
-        local ip fecha ts node
+# Registrar activación (trazabilidad)
+        # 1) Canal preferido: POST al backend del bot (registra con token,
+        #    funciona aunque las reglas RTDB bloqueen escritura anónima)
+        # 2) Fallback: PUT directo a Firebase (si el bot no esta disponible)
+        local ip fecha ts node host resp_act
         ip=$(get_ip)
         fecha=$(date '+%Y-%m-%d %H:%M:%S')
         ts=$(date +%s)
-        local host
         host=$(hostname 2>/dev/null || echo "desconocido")
         # Usar nombre de nodo sanitizado (base64url) igual que el generador
         node=$(key_node_name "$KEY")
-        curl -s --max-time 15 -X PUT \
-            "https://${FB_BASE}/${FB_ACTIVACIONES}/${node}/${ts}.json" \
+        resp_act=$(curl -s --max-time 15 -X POST "$BOT_ACTIVACION_ENDPOINT" \
             -H "Content-Type: application/json" \
-            -d "{\"ip\":\"${ip}\",\"hostname\":\"${host}\",\"fecha\":\"${fecha}\"}" >/dev/null 2>&1
-        log_ok "Activación registrada (IP: $ip)"
+            -d "{\"key\":\"${KEY}\",\"ip\":\"${ip}\",\"hostname\":\"${host}\"}" 2>/dev/null)
+        if [[ "$resp_act" == *'"ok":true'* ]]; then
+            log_ok "Activación registrada (IP: ${ip})"
+        else
+            # Fallback: PUT directo (puede fallar si la rama exige auth)
+            curl -s --max-time 15 -X PUT \
+                "https://${FB_BASE}/${FB_ACTIVACIONES}/${node}/${ts}.json" \
+                -H "Content-Type: application/json" \
+                -d "{\"ip\":\"${ip}\",\"hostname\":\"${host}\",\"fecha\":\"${fecha}\"}" >/dev/null 2>&1
+            log_warn "Activación: bot no confirmó, se intentó registro directo (resp: ${resp_act:-vacia})."
+        fi
     else
         log_warn "Modo prueba: no se guardó ni registró la activación."
     fi
@@ -280,3 +294,4 @@ EOF
 # Ejecutar
 main "$@"
 exit $?
+
