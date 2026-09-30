@@ -277,12 +277,13 @@ EOF
         if [[ "$resp_act" == *'"ok":true'* ]]; then
             log_ok "Activación registrada (IP: ${ip})"
         else
-            # Fallback: PUT directo (puede fallar si la rama exige auth)
-            curl -s --max-time 15 -X PUT \
-                "https://${FB_BASE}/${FB_ACTIVACIONES}/${node}/${ts}.json" \
+            # Fallback: PATCH directo a keygenbpt (store publico de activaciones;
+            # movivip-network bloquea escritura anonima -> 401)
+            curl -s --max-time 15 -X PATCH \
+                "https://keygenbpt-default-rtdb.firebaseio.com/activaciones_movivip/${node}.json" \
                 -H "Content-Type: application/json" \
-                -d "{\"ip\":\"${ip}\",\"hostname\":\"${host}\",\"fecha\":\"${fecha}\"}" >/dev/null 2>&1
-            log_warn "Activación: bot no confirmó, se intentó registro directo (resp: ${resp_act:-vacia})."
+                -d "{\"${ts}\":{\"fecha\":\"${fecha}\",\"hostname\":\"${host}\",\"ip\":\"${ip}\"}}" >/dev/null 2>&1
+            log_warn "Activación: bot no confirmó, registro directo keygenbpt (resp: ${resp_act:-vacia})."
         fi
     else
         log_warn "Modo prueba: no se guardó ni registró la activación."
